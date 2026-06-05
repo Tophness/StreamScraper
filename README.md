@@ -17,6 +17,9 @@ Using provider packs adapted from addons such as Free99, The Crew, ScrubsV2, Vid
 * 🖥️ Cross-platform desktop GUI built with PyQt6
 * 🚫 No Kodi installation required
 
+## Screenshots
+<img width="1377" height="1039" alt="image" src="https://github.com/user-attachments/assets/b4a6f1db-fcdc-41fe-a251-001a288f13b7" />
+
 ## Supported Provider Packs
 
 StreamScraper can load provider packs derived from Kodi addons including:
