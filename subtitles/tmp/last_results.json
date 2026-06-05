@@ -1,0 +1,355 @@
+{
+  "hash": "179a67ab088d909d67ac776961f7333ebef36fb302a2ebcde6b3768b0438e51d",
+  "timestamp": 1780474954.7202404,
+  "results": [
+    {
+      "service_name": "addic7ed",
+      "service": "Addic7ed",
+      "lang": "English",
+      "name": "Breaking Bad.S02E03.0TV.srt",
+      "rating": 0,
+      "lang_code": "en",
+      "sync": "false",
+      "impaired": "false",
+      "color": "deepskyblue",
+      "action_args": {
+        "url": "https://www.addic7ed.com/updated/1/11624/1",
+        "lang": "English",
+        "filename": "Breaking Bad.S02E03.0TV.srt",
+        "referer": "https://www.addic7ed.com/serie/Breaking_Bad/2/3/Bit_by_a_Dead_Bee",
+        "raw": true,
+        "episodeid": "003"
+      }
+    },
+    {
+      "service_name": "addic7ed",
+      "service": "Addic7ed",
+      "lang": "English",
+      "name": "Breaking Bad.S02E03.720p BRRip.srt",
+      "rating": 0,
+      "lang_code": "en",
+      "sync": "false",
+      "impaired": "false",
+      "color": "deepskyblue",
+      "action_args": {
+        "url": "https://www.addic7ed.com/updated/1/11624/6",
+        "lang": "English",
+        "filename": "Breaking Bad.S02E03.720p BRRip.srt",
+        "referer": "https://www.addic7ed.com/serie/Breaking_Bad/2/3/Bit_by_a_Dead_Bee",
+        "raw": true,
+        "episodeid": "003"
+      }
+    },
+    {
+      "service_name": "subdl",
+      "service": "SubDL",
+      "lang": "English",
+      "name": "Breaking.Bad.S02E03.HDTV.XviD-0TV",
+      "rating": 0,
+      "lang_code": "en",
+      "sync": "false",
+      "impaired": "true",
+      "color": "springgreen",
+      "action_args": {
+        "url": "/subtitle/2120178-233918.zip",
+        "lang": "English",
+        "filename": "Breaking.Bad.S02E03.HDTV.XviD-0TV",
+        "episodeid": "003"
+      }
+    },
+    {
+      "service_name": "subdl",
+      "service": "SubDL",
+      "lang": "English",
+      "name": "Breaking.Bad.S02E03.480p.BRRip.x264-BoB",
+      "rating": 0,
+      "lang_code": "en",
+      "sync": "false",
+      "impaired": "true",
+      "color": "springgreen",
+      "action_args": {
+        "url": "/subtitle/2120023-793474.zip",
+        "lang": "English",
+        "filename": "Breaking.Bad.S02E03.480p.BRRip.x264-BoB",
+        "episodeid": "003"
+      }
+    },
+    {
+      "service_name": "subdl",
+      "service": "SubDL",
+      "lang": "English",
+      "name": "Breaking.Bad.S02E03.720p.HDTV.x264-0TV",
+      "rating": 0,
+      "lang_code": "en",
+      "sync": "false",
+      "impaired": "true",
+      "color": "springgreen",
+      "action_args": {
+        "url": "/subtitle/2120179-215269.zip",
+        "lang": "English",
+        "filename": "Breaking.Bad.S02E03.720p.HDTV.x264-0TV",
+        "episodeid": "003"
+      }
+    },
+    {
+      "service_name": "opensubtitles",
+      "service": "OpenSubtitles [.com]",
+      "lang": "English",
+      "name": "breaking.bad.s02e03.dvdrip.xvid-nodlabs",
+      "rating": 0,
+      "lang_code": "en",
+      "sync": "false",
+      "impaired": "false",
+      "color": "springgreen",
+      "action_args": {
+        "url": 2472963,
+        "lang": "English",
+        "filename": "breaking.bad.s02e03.dvdrip.xvid-nodlabs",
+        "gzip": true,
+        "episodeid": "003"
+      }
+    },
+    {
+      "service_name": "opensubtitles",
+      "service": "OpenSubtitles [.com]",
+      "lang": "English",
+      "name": "breaking.bad.s02e03.dvdrip.xvid-nodlabs",
+      "rating": 0,
+      "lang_code": "en",
+      "sync": "false",
+      "impaired": "false",
+      "color": "springgreen",
+      "action_args": {
+        "url": 2467630,
+        "lang": "English",
+        "filename": "breaking.bad.s02e03.dvdrip.xvid-nodlabs",
+        "gzip": true,
+        "episodeid": "003"
+      }
+    },
+    {
+      "service_name": "subdl",
+      "service": "SubDL",
+      "lang": "English",
+      "name": "breaking.bad.s02e03.720p.brrip.x264-visionx",
+      "rating": 0,
+      "lang_code": "en",
+      "sync": "false",
+      "impaired": "false",
+      "color": "springgreen",
+      "action_args": {
+        "url": "/subtitle/2120004-1109787.zip",
+        "lang": "English",
+        "filename": "breaking.bad.s02e03.720p.brrip.x264-visionx",
+        "episodeid": "003"
+      }
+    },
+    {
+      "service_name": "opensubtitles_org",
+      "service": "OpenSubtitles [.org]",
+      "lang": "English",
+      "name": "breaking.bad.s02e03.dvdrip.xvid-nodlabs.sub",
+      "rating": 0,
+      "lang_code": "en",
+      "sync": "false",
+      "impaired": "false",
+      "color": "springgreen",
+      "action_args": {
+        "url": "https://dl.opensubtitles.org/en/download/src-api/vrf-f56a0bc4/sid-wHYJqcU9BpfQZWcqDro04UUf2a6/sub/3689359",
+        "lang": "English",
+        "filename": "breaking.bad.s02e03.dvdrip.xvid-nodlabs.sub",
+        "episodeid": "003"
+      }
+    },
+    {
+      "service_name": "subdl",
+      "service": "SubDL",
+      "lang": "English",
+      "name": "Breaking.Bad.S02.1080p.Bluray.x265-YAWNiX",
+      "rating": 0,
+      "lang_code": "en",
+      "sync": "false",
+      "impaired": "false",
+      "color": "springgreen",
+      "action_args": {
+        "url": "/subtitle/2605488-2780344.zip",
+        "lang": "English",
+        "filename": "Breaking.Bad.S02.1080p.Bluray.x265-YAWNiX",
+        "episodeid": "003"
+      }
+    },
+    {
+      "service_name": "subsource",
+      "service": "SubSource",
+      "lang": "English",
+      "name": "Breaking.Bad.S02.1080p.Bluray.x265-YAWNiX",
+      "rating": 0,
+      "lang_code": "en",
+      "sync": "false",
+      "impaired": "false",
+      "color": "teal",
+      "action_args": {
+        "url": "2780344#Breaking.Bad.S02.1080p.Bluray.x265-YAWNiX",
+        "lang": "English",
+        "filename": "Breaking.Bad.S02.1080p.Bluray.x265-YAWNiX",
+        "full_link": "/subtitle/breaking-bad-season-2/english/2780344",
+        "episodeid": "003"
+      }
+    },
+    {
+      "service_name": "subdl",
+      "service": "SubDL",
+      "lang": "English",
+      "name": "Breaking.Bad.Season.02.720p-PFT",
+      "rating": 0,
+      "lang_code": "en",
+      "sync": "false",
+      "impaired": "true",
+      "color": "springgreen",
+      "action_args": {
+        "url": "/subtitle/2119854-856369.zip",
+        "lang": "English",
+        "filename": "Breaking.Bad.Season.02.720p-PFT",
+        "episodeid": "003"
+      }
+    },
+    {
+      "service_name": "subdl",
+      "service": "SubDL",
+      "lang": "English",
+      "name": "breaking.bad.season.02.720p-PFT",
+      "rating": 0,
+      "lang_code": "en",
+      "sync": "false",
+      "impaired": "false",
+      "color": "springgreen",
+      "action_args": {
+        "url": "/subtitle/2119860-892860.zip",
+        "lang": "English",
+        "filename": "breaking.bad.season.02.720p-PFT",
+        "episodeid": "003"
+      }
+    },
+    {
+      "service_name": "subdl",
+      "service": "SubDL",
+      "lang": "English",
+      "name": "Breaking.Bad.S02.720p.Bluray.x264-CLUE",
+      "rating": 0,
+      "lang_code": "en",
+      "sync": "false",
+      "impaired": "false",
+      "color": "springgreen",
+      "action_args": {
+        "url": "/subtitle/2120028-310080.zip",
+        "lang": "English",
+        "filename": "Breaking.Bad.S02.720p.Bluray.x264-CLUE",
+        "episodeid": "003"
+      }
+    },
+    {
+      "service_name": "subdl",
+      "service": "SubDL",
+      "lang": "English",
+      "name": "Breaking.Bad.S02.720p.BluRay.x264-CLUE",
+      "rating": 0,
+      "lang_code": "en",
+      "sync": "false",
+      "impaired": "false",
+      "color": "springgreen",
+      "action_args": {
+        "url": "/subtitle/2120027-806465.zip",
+        "lang": "English",
+        "filename": "Breaking.Bad.S02.720p.BluRay.x264-CLUE",
+        "episodeid": "003"
+      }
+    },
+    {
+      "service_name": "subdl",
+      "service": "SubDL",
+      "lang": "English",
+      "name": "Breaking Bad s02 720p brrip.sujaidr",
+      "rating": 0,
+      "lang_code": "en",
+      "sync": "false",
+      "impaired": "true",
+      "color": "springgreen",
+      "action_args": {
+        "url": "/subtitle/2120026-1112953.zip",
+        "lang": "English",
+        "filename": "Breaking Bad s02 720p brrip.sujaidr",
+        "episodeid": "003"
+      }
+    },
+    {
+      "service_name": "subsource",
+      "service": "SubSource",
+      "lang": "English",
+      "name": "Breaking Bad - Season 2 (WEBRip)",
+      "rating": 0,
+      "lang_code": "en",
+      "sync": "false",
+      "impaired": "false",
+      "color": "teal",
+      "action_args": {
+        "url": "3002114#Breaking Bad - Season 2 (WEBRip)",
+        "lang": "English",
+        "filename": "Breaking Bad - Season 2 (WEBRip)",
+        "full_link": "/subtitle/breaking-bad-season-2/english/3002114",
+        "episodeid": "003"
+      }
+    },
+    {
+      "service_name": "subdl",
+      "service": "SubDL",
+      "lang": "English",
+      "name": "Breaking.Bad.S02.DVDRip.XviD-NODLABS",
+      "rating": 0,
+      "lang_code": "en",
+      "sync": "false",
+      "impaired": "false",
+      "color": "springgreen",
+      "action_args": {
+        "url": "/subtitle/2120245-384640.zip",
+        "lang": "English",
+        "filename": "Breaking.Bad.S02.DVDRip.XviD-NODLABS",
+        "episodeid": "003"
+      }
+    },
+    {
+      "service_name": "subdl",
+      "service": "SubDL",
+      "lang": "English",
+      "name": "breaking bad season 2 full",
+      "rating": 0,
+      "lang_code": "en",
+      "sync": "false",
+      "impaired": "false",
+      "color": "springgreen",
+      "action_args": {
+        "url": "/subtitle/2119852-1515708.zip",
+        "lang": "English",
+        "filename": "breaking bad season 2 full",
+        "episodeid": "003"
+      }
+    },
+    {
+      "service_name": "subsource",
+      "service": "SubSource",
+      "lang": "English",
+      "name": "breaking bad season 2 full",
+      "rating": 0,
+      "lang_code": "en",
+      "sync": "false",
+      "impaired": "false",
+      "color": "teal",
+      "action_args": {
+        "url": "1515708#breaking bad season 2 full",
+        "lang": "English",
+        "filename": "breaking bad season 2 full",
+        "full_link": "/subtitle/breaking-bad-season-2/english/1515708",
+        "episodeid": "003"
+      }
+    }
+  ]
+}

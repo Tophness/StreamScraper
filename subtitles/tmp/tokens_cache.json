@@ -1,0 +1,11 @@
+{
+  "opensubtitles": {
+    "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqVGlVc3VZckFtckpsUnphaHE3b1d4SDhDQ0ZWaDhKSiIsImV4cCI6MTc4MDU0NjQ1N30.kk-UfMEaytd9JbIWcVzlc2N4UDhSKaxrxTRY-N0i6xs",
+    "base_url": "api.opensubtitles.com",
+    "ttl": "2026-06-04 18:14:01"
+  },
+  "opensubtitles_org": {
+    "token": "wHYJqcU9BpfQZWcqDro04UUf2a6",
+    "ttl": "2026-06-03 20:14:01"
+  }
+}
