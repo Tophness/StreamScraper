@@ -219,20 +219,20 @@ class UniversalScraper:
                 active_providers.append((pack_name, name, provider))
 
         total_providers = len(active_providers)
-
+        
         if progress_callback:
-            progress_callback(None, None, 'started', 0, 0, total_providers)
+            progress_callback(None, None, 'started', [], 0, total_providers)
 
         completed_lock = threading.Lock()
         completed = 0
 
-        def local_callback(pack_name, name, status, count):
+        def local_callback(pack_name, name, status, found_results):
             nonlocal completed
             with completed_lock:
                 completed += 1
                 curr = completed
             if progress_callback:
-                progress_callback(pack_name, name, status, count, curr, total_providers)
+                progress_callback(pack_name, name, status, found_results, curr, total_providers)
 
         for pack_name, name, provider in active_providers:
             if content == 'movie':
@@ -259,7 +259,6 @@ class UniversalScraper:
             print(f"[ENGINE] Waiting for {alive} providers...", end='\r')
             time.sleep(0.5)
 
-        # Quality sorting
         quality_map = {'4k': 0, '1080p': 1, '720p': 2, 'hd': 2, 'sd': 3, 'cam': 4, 'scr': 4}
         for s in self.sources:
             s['q_sort'] = quality_map.get(str(s.get('quality')).lower(), 3)
@@ -273,7 +272,7 @@ class UniversalScraper:
 
     def worker(self, provider, content, title, localtitle, aliases, year, imdb, tmdb, tvdb, season, episode, premiered, name, pack_name, callback=None):
         print(f"[ENGINE] Scraping from: {pack_name} -> {name}")
-        results_count = 0
+        results = []
         status = "failed"
         try:
             if content == 'movie':
@@ -304,7 +303,6 @@ class UniversalScraper:
                     results = provider.sources(url, self.hostDict)
 
                 if results:
-                    results_count = len(results)
                     status = "success"
                     for res in results:
                         res.setdefault('provider', f"[{pack_name}] {name}")
@@ -313,16 +311,19 @@ class UniversalScraper:
                     self.sources.extend(results)
                 else:
                     status = "no sources"
+                    results = []
             else:
                 status = "no url"
+                results = []
         except Exception as e:
             print(f"[ENGINE] Error in worker for {name}: {e}")
             traceback.print_exc()
             status = f"error: {str(e)}"
+            results = []
         finally:
             if callback:
                 try:
-                    callback(pack_name, name, status, results_count)
+                    callback(pack_name, name, status, results)
                 except Exception as cb_err:
                     print(f"[ENGINE] Error calling progress callback: {cb_err}")
 
@@ -880,6 +881,7 @@ class TvShowSelectionDialog(QDialog):
 
 class ScrapeWorker(QThread):
     sources_ready = pyqtSignal(list)
+    sources_found = pyqtSignal(list)
     progress_updated = pyqtSignal(int, int, str)
     
     def __init__(self, item, enabled_packs, season=None, episode=None, premiered=None): 
@@ -895,13 +897,15 @@ class ScrapeWorker(QThread):
             tmdb_id = str(self.item['id'])
             api_key = "f5608fba6ab49e9985828b35d5653321"
             
-            def local_progress_callback(pack_name, name, status, count, current_completed, total_count):
+            def local_progress_callback(pack_name, name, status, found_results, current_completed, total_count):
                 if status == 'started':
                     self.progress_updated.emit(0, total_count, f"Starting search across {total_count} providers...")
                 else:
+                    count = len(found_results) if found_results else 0
                     msg = f"Scraped {pack_name} -> {name}: {status.upper()}"
                     if count > 0:
                         msg += f" ({count} sources found)"
+                        self.sources_found.emit(found_results)
                     self.progress_updated.emit(current_completed, total_count, msg)
 
             if self.season is not None and self.episode is not None:
@@ -1387,7 +1391,7 @@ class UniversalApp(QMainWindow):
         panel_layout.addLayout(sub_row)
         
         self.main_layout.addWidget(self.url_panel)
-
+        
         self.progress_container = QWidget()
         self.progress_layout = QVBoxLayout(self.progress_container)
         self.progress_layout.setContentsMargins(0, 5, 0, 5)
@@ -1417,6 +1421,10 @@ class UniversalApp(QMainWindow):
         self.progress_layout.addWidget(self.progress)
         self.progress_container.setVisible(False)
         self.main_layout.addWidget(self.progress_container)
+
+        self.found_sources = []
+        self.is_resolving = False
+        self.is_downloading_sub = False
 
     def open_settings(self):
         dlg = SettingsDialog(self)
@@ -1448,6 +1456,7 @@ class UniversalApp(QMainWindow):
         self.subtitles_list.clear()
         self.edit_stream_url.clear()
         self.edit_subtitle_url.clear()
+        self.found_sources = []
         
         media_type = item.get('media_type', 'movie')
         
@@ -1466,6 +1475,7 @@ class UniversalApp(QMainWindow):
                 
                 self.worker = ScrapeWorker(item, enabled_packs, season=season, episode=episode, premiered=premiered)
                 self.worker.sources_ready.connect(self.on_found)
+                self.worker.sources_found.connect(self.on_sources_found)
                 self.worker.progress_updated.connect(self.on_scrape_progress)
                 self.worker.start()
                 
@@ -1483,6 +1493,7 @@ class UniversalApp(QMainWindow):
             
             self.worker = ScrapeWorker(item, enabled_packs)
             self.worker.sources_ready.connect(self.on_found)
+            self.worker.sources_found.connect(self.on_sources_found)
             self.worker.progress_updated.connect(self.on_scrape_progress)
             self.worker.start()
             
@@ -1495,12 +1506,26 @@ class UniversalApp(QMainWindow):
         self.progress.setValue(current)
         self.progress_status_label.setText(status_text)
 
+    def on_sources_found(self, new_sources):
+        self.found_sources.extend(new_sources)
+        for s in new_sources:
+            self.sources_list.addItem(f"[{s.get('quality', 'SD')}] {s.get('source')} ({s.get('provider')})")
+
     def on_found(self, slist):
         self.progress_container.setVisible(False)
-        self.found_sources = slist
-        if not slist: self.sources_list.addItem("No sources found.")
-        for s in slist: 
-            self.sources_list.addItem(f"[{s.get('quality', 'SD')}] {s.get('source')} ({s.get('provider')})")
+        
+        if not self.found_sources:
+            self.sources_list.clear()
+            self.sources_list.addItem("No sources found.")
+        else:
+            quality_map = {'4k': 0, '1080p': 1, '720p': 2, 'hd': 2, 'sd': 3, 'cam': 4, 'scr': 4}
+            for s in self.found_sources:
+                s['q_sort'] = quality_map.get(str(s.get('quality')).lower(), 3)
+            self.found_sources.sort(key=lambda x: x['q_sort'])
+            
+            self.sources_list.clear()
+            for s in self.found_sources:
+                self.sources_list.addItem(f"[{s.get('quality', 'SD')}] {s.get('source')} ({s.get('provider')})")
 
     def on_subtitles_found(self, sub_list):
         self.found_subtitles = sub_list
@@ -1510,15 +1535,16 @@ class UniversalApp(QMainWindow):
             self.subtitles_list.addItem(f"[{s.get('service')}] {s.get('lang')}: {s.get('name')}")
 
     def on_resolve(self, li):
+        if self.is_resolving:
+            return
+            
         idx = self.sources_list.row(li)
         if idx >= len(self.found_sources): return
         source_data = self.found_sources[idx]
         print(f"\n--- RESOLVING ---\nSource: {source_data['source']}\nProvider: {source_data['provider']}")
         
-        self.progress_container.setVisible(True)
-        self.progress.setRange(0, 0)
-        self.progress_status_label.setText("Resolving stream URL...")
-        self.edit_stream_url.clear()
+        self.is_resolving = True
+        self.edit_stream_url.setText("Resolving stream URL...")
         
         self.resolve_worker = ResolveWorker(source_data, self.get_enabled_packs())
         self.resolve_worker.resolved.connect(self.on_resolved)
@@ -1526,25 +1552,27 @@ class UniversalApp(QMainWindow):
         self.resolve_worker.start()
 
     def on_resolved(self, final):
-        self.progress_container.setVisible(False)
+        self.is_resolving = False
         self.edit_stream_url.setText(final)
         QApplication.clipboard().setText(final)
         print(f"SUCCESS: {final}")
         QMessageBox.information(self, "Success", "Stream URL resolved and copied to clipboard!")
 
     def on_resolve_failed(self, err_msg):
-        self.progress_container.setVisible(False)
+        self.is_resolving = False
+        self.edit_stream_url.clear()
         QMessageBox.warning(self, "Failed", f"Could not resolve stream: {err_msg}")
 
     def on_subtitle_selected(self, li):
+        if self.is_downloading_sub:
+            return
+            
         idx = self.subtitles_list.row(li)
         if idx >= len(self.found_subtitles): return
         selected = self.found_subtitles[idx]
         
-        self.progress_container.setVisible(True)
-        self.progress.setRange(0, 0)
-        self.progress_status_label.setText("Downloading subtitle...")
-        self.edit_subtitle_url.clear()
+        self.is_downloading_sub = True
+        self.edit_subtitle_url.setText("Downloading subtitle...")
         
         self.sub_download_worker = SubtitleDownloadWorker(
             selected['service_name'],
@@ -1556,24 +1584,25 @@ class UniversalApp(QMainWindow):
         self.sub_download_worker.start()
 
     def on_subtitle_downloaded(self, filepath):
-        self.progress_container.setVisible(False)
+        self.is_downloading_sub = False
         self.edit_subtitle_url.setText(filepath)
         QApplication.clipboard().setText(filepath)
         QMessageBox.information(self, "Success", f"Subtitle downloaded successfully to:\n{filepath}\n\nPath copied to clipboard!")
 
     def on_subtitle_download_failed(self, err_msg):
-        self.progress_container.setVisible(False)
+        self.is_downloading_sub = False
+        self.edit_subtitle_url.clear()
         QMessageBox.warning(self, "Failed", f"Could not download subtitle: {err_msg}")
 
     def copy_stream_url(self):
         url = self.edit_stream_url.text()
-        if url:
+        if url and not self.is_resolving:
             QApplication.clipboard().setText(url)
             QMessageBox.information(self, "Success", "Stream URL copied to clipboard!")
 
     def copy_subtitle_url(self):
         url = self.edit_subtitle_url.text()
-        if url:
+        if url and not self.is_downloading_sub:
             QApplication.clipboard().setText(url)
             QMessageBox.information(self, "Success", "Subtitle URL/Path copied to clipboard!")
 
