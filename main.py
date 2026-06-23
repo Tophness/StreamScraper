@@ -174,19 +174,12 @@ class UniversalScraper:
             self.hostDict = cfg.get("whitelisted_hosts", [])
             self.hostDict = list(set([h.lower() for h in self.hostDict]))
         else:
-            # When whitelist is OFF, we use an empty list instead of None.
-            # This prevents crashes in source files that do 'hostDict.append()'
-            # while 'source_utils.is_host_valid' is updated to treat empty as 'allow all'.
             self.hostDict = []
 
-        # Subset of the whitelist that corresponds to provider-pack source domains
-        # (e.g. 'freeprojecttv.cyou'). Used to skip entire providers whose
-        # self.domains are not in the whitelist. Only meaningful when hostDict
-        # is non-empty (i.e. the whitelist is active).
         provider_set = set(gather_provider_pack_hosts())
         self.provider_hosts = [h for h in self.hostDict if h in provider_set]
 
-    def getSources(self, title, year, imdb, tmdb, tvdb='0', season=None, episode=None, tvshowtitle=None, premiered='0'):
+    def getSources(self, title, year, imdb, tmdb, tvdb='0', season=None, episode=None, tvshowtitle=None, premiered='0', progress_callback=None):
         print(f"\n[ENGINE] Starting Universal Scrape for: {title} ({year})")
         providers = []
 
@@ -204,35 +197,51 @@ class UniversalScraper:
                         spec.loader.exec_module(mod)
                         if hasattr(mod, 'source'):
                             instance = mod.source()
-                            # If the whitelist is active and the provider declared
-                            # one or more self.domains, require at least one of them
-                            # to be whitelisted. Providers with empty domains are
-                            # always allowed (no info to filter on).
                             instance_domains = [d.lower() for d in (getattr(instance, 'domains', None) or [])]
                             if self.hostDict and instance_domains:
                                 if not any(d in self.provider_hosts for d in instance_domains):
                                     print(f"[ENGINE] Skipping {pack}/{file}: no whitelisted domains in {instance_domains}")
                                     continue
                             providers.append((pack, file[:-3], instance))
-                            # Use a unique key for provider instances to avoid collisions between packs
                             self.provider_instances[f"{pack}_{file[:-3]}"] = instance
                     except Exception as e:
                         print(f"[ENGINE] Failed to load {pack}/{file}: {e}")
 
         content = 'movie' if tvshowtitle is None else 'episode'
         threads = []
-        # We pass aliases as a string representation of a list because many providers 
-        # use eval(data['aliases']) and would crash if the key is missing or not a string.
         aliases_str = "[]" 
         
+        active_providers = []
         for pack_name, name, provider in providers:
             if content == 'movie' and hasattr(provider, 'movie'):
-                threads.append(threading.Thread(target=self.worker, args=(
-                    provider, content, title, title, aliases_str, year, imdb, tmdb, None, None, None, None, name, pack_name
-                )))
+                active_providers.append((pack_name, name, provider))
             elif content == 'episode' and hasattr(provider, 'tvshow'):
+                active_providers.append((pack_name, name, provider))
+
+        total_providers = len(active_providers)
+
+        if progress_callback:
+            progress_callback(None, None, 'started', 0, 0, total_providers)
+
+        completed_lock = threading.Lock()
+        completed = 0
+
+        def local_callback(pack_name, name, status, count):
+            nonlocal completed
+            with completed_lock:
+                completed += 1
+                curr = completed
+            if progress_callback:
+                progress_callback(pack_name, name, status, count, curr, total_providers)
+
+        for pack_name, name, provider in active_providers:
+            if content == 'movie':
                 threads.append(threading.Thread(target=self.worker, args=(
-                    provider, content, title, title, aliases_str, year, imdb, tmdb, tvdb, season, episode, premiered, name, pack_name
+                    provider, content, title, title, aliases_str, year, imdb, tmdb, None, None, None, None, name, pack_name, local_callback
+                )))
+            elif content == 'episode':
+                threads.append(threading.Thread(target=self.worker, args=(
+                    provider, content, title, title, aliases_str, year, imdb, tmdb, tvdb, season, episode, premiered, name, pack_name, local_callback
                 )))
 
         [t.start() for t in threads]
@@ -256,15 +265,16 @@ class UniversalScraper:
             s['q_sort'] = quality_map.get(str(s.get('quality')).lower(), 3)
         self.sources.sort(key=lambda x: x['q_sort'])
 
-        # Final filtering: Ensure every result has a 'provider' and 'source' field
         for s in self.sources:
             if 'source' not in s and 'host' in s: s['source'] = s['host']
             if 'provider' not in s: s['provider'] = '[Unknown]'
 
         return self.sources
 
-    def worker(self, provider, content, title, localtitle, aliases, year, imdb, tmdb, tvdb, season, episode, premiered, name, pack_name):
+    def worker(self, provider, content, title, localtitle, aliases, year, imdb, tmdb, tvdb, season, episode, premiered, name, pack_name, callback=None):
         print(f"[ENGINE] Scraping from: {pack_name} -> {name}")
+        results_count = 0
+        status = "failed"
         try:
             if content == 'movie':
                 sig = inspect.signature(provider.movie)
@@ -294,15 +304,27 @@ class UniversalScraper:
                     results = provider.sources(url, self.hostDict)
 
                 if results:
+                    results_count = len(results)
+                    status = "success"
                     for res in results:
                         res.setdefault('provider', f"[{pack_name}] {name}")
                         res.setdefault('direct', False)
-                        # Store the internal key for resolution
                         res['provider_key'] = f"{pack_name}_{name}"
                     self.sources.extend(results)
+                else:
+                    status = "no sources"
+            else:
+                status = "no url"
         except Exception as e:
             print(f"[ENGINE] Error in worker for {name}: {e}")
             traceback.print_exc()
+            status = f"error: {str(e)}"
+        finally:
+            if callback:
+                try:
+                    callback(pack_name, name, status, results_count)
+                except Exception as cb_err:
+                    print(f"[ENGINE] Error calling progress callback: {cb_err}")
 
     def resolveSource(self, source_data):
         url = source_data.get('url')
@@ -438,7 +460,6 @@ class SettingsDialog(QDialog):
         self.tabs.addTab(self.tab_hosts, "Provider Whitelist")
         self.update_hosts_enabled_state()
 
-        # Subtitles Settings Tab
         self.tab_subtitles = QWidget()
         self.layout_subtitles = QVBoxLayout(self.tab_subtitles)
         sub_scroll = QScrollArea()
@@ -579,24 +600,36 @@ class SettingsDialog(QDialog):
 
     def select_all_hosts(self):
         for cb in self.host_checkboxes.values():
+            cb.blockSignals(True)
             if cb.isVisible():
                 cb.setChecked(True)
+            cb.blockSignals(False)
+        self.on_host_checkbox_changed()
 
     def clear_all_hosts(self):
         for cb in self.host_checkboxes.values():
+            cb.blockSignals(True)
             cb.setChecked(False)
+            cb.blockSignals(False)
+        self.on_host_checkbox_changed()
 
     def reset_hosts_to_default(self):
         default_hosts = get_default_whitelist()
         default_hosts_low = [d.lower() for d in default_hosts]
         for h, cb in self.host_checkboxes.items():
+            cb.blockSignals(True)
             cb.setChecked(h in default_hosts_low)
+            cb.blockSignals(False)
+        self.on_host_checkbox_changed()
 
     def on_host_checkbox_changed(self):
         any_checked = any(cb.isChecked() for cb in self.host_checkboxes.values())
-        self.cb_use_only.blockSignals(True)
-        self.cb_use_only.setChecked(any_checked)
-        self.cb_use_only.blockSignals(False)
+        
+        if any_checked:
+            self.cb_use_only.blockSignals(True)
+            self.cb_use_only.setChecked(True)
+            self.cb_use_only.blockSignals(False)
+            
         is_checked = self.cb_use_only.isChecked()
         self.host_search.setEnabled(is_checked)
         self.btn_all.setEnabled(is_checked)
@@ -741,7 +774,6 @@ class TvShowSelectionDialog(QDialog):
         self.title_label.setStyleSheet("color: #e0e0e0;")
         self.layout.addWidget(self.title_label)
         
-        # Season selection
         season_layout = QHBoxLayout()
         season_layout.addWidget(QLabel("Season:"))
         self.season_combo = QComboBox()
@@ -749,19 +781,16 @@ class TvShowSelectionDialog(QDialog):
         season_layout.addWidget(self.season_combo)
         self.layout.addLayout(season_layout)
         
-        # Episode list
         self.layout.addWidget(QLabel("Episodes:"))
         self.episodes_list = QListWidget()
         self.episodes_list.itemSelectionChanged.connect(self.on_episode_selection_changed)
         self.episodes_list.itemDoubleClicked.connect(self.on_episode_double_clicked)
         self.layout.addWidget(self.episodes_list)
         
-        # Status Label
         self.status_label = QLabel("Loading seasons...")
         self.status_label.setStyleSheet("color: #aaa;")
         self.layout.addWidget(self.status_label)
         
-        # Buttons
         btn_layout = QHBoxLayout()
         self.btn_select = QPushButton("Scrape Episode")
         self.btn_select.setEnabled(False)
@@ -774,7 +803,6 @@ class TvShowSelectionDialog(QDialog):
         btn_layout.addWidget(self.btn_select)
         self.layout.addLayout(btn_layout)
         
-        # Start details fetcher
         self.details_fetcher = TvDetailsFetcher(self.item['id'], self.api_key)
         self.details_fetcher.details_ready.connect(self.on_details_ready)
         self.details_fetcher.start()
@@ -785,7 +813,6 @@ class TvShowSelectionDialog(QDialog):
             return
         
         self.seasons = [s for s in details['seasons'] if s.get('season_number') is not None]
-        # Sort by season number
         self.seasons.sort(key=lambda x: x['season_number'])
         
         self.season_combo.blockSignals(True)
@@ -853,6 +880,8 @@ class TvShowSelectionDialog(QDialog):
 
 class ScrapeWorker(QThread):
     sources_ready = pyqtSignal(list)
+    progress_updated = pyqtSignal(int, int, str)
+    
     def __init__(self, item, enabled_packs, season=None, episode=None, premiered=None): 
         super().__init__()
         self.item = item
@@ -865,6 +894,16 @@ class ScrapeWorker(QThread):
         try:
             tmdb_id = str(self.item['id'])
             api_key = "f5608fba6ab49e9985828b35d5653321"
+            
+            def local_progress_callback(pack_name, name, status, count, current_completed, total_count):
+                if status == 'started':
+                    self.progress_updated.emit(0, total_count, f"Starting search across {total_count} providers...")
+                else:
+                    msg = f"Scraped {pack_name} -> {name}: {status.upper()}"
+                    if count > 0:
+                        msg += f" ({count} sources found)"
+                    self.progress_updated.emit(current_completed, total_count, msg)
+
             if self.season is not None and self.episode is not None:
                 ext_url = f"https://api.themoviedb.org/3/tv/{tmdb_id}/external_ids?api_key={api_key}"
                 imdb_id = requests.get(ext_url).json().get('imdb_id', '0')
@@ -877,7 +916,8 @@ class ScrapeWorker(QThread):
                     season=str(self.season),
                     episode=str(self.episode),
                     tvshowtitle=self.item.get('name'),
-                    premiered=self.premiered or '0'
+                    premiered=self.premiered or '0',
+                    progress_callback=local_progress_callback
                 )
             else:
                 ext_url = f"https://api.themoviedb.org/3/movie/{tmdb_id}/external_ids?api_key={api_key}"
@@ -887,7 +927,8 @@ class ScrapeWorker(QThread):
                     title=self.item['title'], 
                     year=self.item.get('release_date', '0000')[:4], 
                     imdb=imdb_id, 
-                    tmdb=tmdb_id
+                    tmdb=tmdb_id,
+                    progress_callback=local_progress_callback
                 )
             self.sources_ready.emit(file_sources)
         except Exception as e:
@@ -1272,7 +1313,6 @@ class UniversalApp(QMainWindow):
         
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         
-        # Results Pane
         self.results_widget = QWidget()
         self.results_layout = QVBoxLayout(self.results_widget)
         self.results_layout.setContentsMargins(0, 0, 0, 0)
@@ -1281,7 +1321,6 @@ class UniversalApp(QMainWindow):
         self.results = QListWidget(); self.results.itemClicked.connect(self.on_selected)
         self.results_layout.addWidget(self.results)
         
-        # Streams Pane
         self.sources_widget = QWidget()
         self.sources_layout = QVBoxLayout(self.sources_widget)
         self.sources_layout.setContentsMargins(0, 0, 0, 0)
@@ -1290,7 +1329,6 @@ class UniversalApp(QMainWindow):
         self.sources_list = QListWidget(); self.sources_list.itemClicked.connect(self.on_resolve)
         self.sources_layout.addWidget(self.sources_list)
         
-        # Subtitles Pane
         self.subtitles_widget = QWidget()
         self.subtitles_layout = QVBoxLayout(self.subtitles_widget)
         self.subtitles_layout.setContentsMargins(0, 0, 0, 0)
@@ -1303,11 +1341,9 @@ class UniversalApp(QMainWindow):
         self.splitter.addWidget(self.sources_widget)
         self.splitter.addWidget(self.subtitles_widget)
         
-        # Make the splitter columns equal width by default
         self.splitter.setSizes([400, 400, 400])
         self.main_layout.addWidget(self.splitter)
         
-        # Bottom URL Panel
         self.url_panel = QFrame()
         self.url_panel.setFrameShape(QFrame.Shape.StyledPanel)
         self.url_panel.setStyleSheet('''
@@ -1324,7 +1360,6 @@ class UniversalApp(QMainWindow):
         panel_layout = QVBoxLayout(self.url_panel)
         panel_layout.setContentsMargins(15, 10, 15, 10)
         
-        # Stream URL Row
         stream_row = QHBoxLayout()
         stream_lbl = QLabel("Stream URL:")
         stream_lbl.setFixedWidth(90)
@@ -1338,7 +1373,6 @@ class UniversalApp(QMainWindow):
         stream_row.addWidget(self.btn_copy_stream)
         panel_layout.addLayout(stream_row)
         
-        # Subtitle URL Row
         sub_row = QHBoxLayout()
         sub_lbl = QLabel("Subtitle URL:")
         sub_lbl.setFixedWidth(90)
@@ -1353,8 +1387,36 @@ class UniversalApp(QMainWindow):
         panel_layout.addLayout(sub_row)
         
         self.main_layout.addWidget(self.url_panel)
+
+        self.progress_container = QWidget()
+        self.progress_layout = QVBoxLayout(self.progress_container)
+        self.progress_layout.setContentsMargins(0, 5, 0, 5)
         
-        self.progress = QProgressBar(); self.progress.setVisible(False); self.main_layout.addWidget(self.progress)
+        self.progress_status_label = QLabel("Ready")
+        self.progress_status_label.setStyleSheet("color: #e8870e; font-weight: bold; font-size: 11px;")
+        self.progress_layout.addWidget(self.progress_status_label)
+        
+        self.progress = QProgressBar()
+        self.progress.setStyleSheet('''
+            QProgressBar {
+                background-color: #2d2d2d;
+                border: 1px solid #444;
+                border-radius: 6px;
+                text-align: center;
+                color: #e0e0e0;
+                font-weight: bold;
+                height: 18px;
+            }
+            QProgressBar::chunk {
+                background-color: #0e639c;
+                border-radius: 5px;
+            }
+        ''')
+        self.progress.setTextVisible(True)
+        self.progress.setFormat("%v of %m Scraped (%p%)")
+        self.progress_layout.addWidget(self.progress)
+        self.progress_container.setVisible(False)
+        self.main_layout.addWidget(self.progress_container)
 
     def open_settings(self):
         dlg = SettingsDialog(self)
@@ -1396,36 +1458,46 @@ class UniversalApp(QMainWindow):
                 episode = dlg.selected_episode
                 premiered = dlg.selected_premiered
                 
-                self.progress.setVisible(True); self.progress.setRange(0, 0)
+                self.progress_container.setVisible(True)
+                self.progress.setRange(0, 0)
+                self.progress_status_label.setText("Preparing scrapers...")
+                
                 enabled_packs = self.get_enabled_packs()
                 
-                # Search Streams
                 self.worker = ScrapeWorker(item, enabled_packs, season=season, episode=episode, premiered=premiered)
                 self.worker.sources_ready.connect(self.on_found)
+                self.worker.progress_updated.connect(self.on_scrape_progress)
                 self.worker.start()
                 
-                # Search Subtitles
                 self.sub_worker = SubtitlesScrapeWorker(item, GLOBAL_CONFIG, season=season, episode=episode)
                 self.sub_worker.subtitles_ready.connect(self.on_subtitles_found)
                 self.sub_worker.start()
             else:
-                self.progress.setVisible(False)
+                self.progress_container.setVisible(False)
         else:
-            self.progress.setVisible(True); self.progress.setRange(0, 0)
+            self.progress_container.setVisible(True)
+            self.progress.setRange(0, 0)
+            self.progress_status_label.setText("Preparing scrapers...")
+            
             enabled_packs = self.get_enabled_packs()
             
-            # Search Streams
             self.worker = ScrapeWorker(item, enabled_packs)
             self.worker.sources_ready.connect(self.on_found)
+            self.worker.progress_updated.connect(self.on_scrape_progress)
             self.worker.start()
             
-            # Search Subtitles
             self.sub_worker = SubtitlesScrapeWorker(item, GLOBAL_CONFIG)
             self.sub_worker.subtitles_ready.connect(self.on_subtitles_found)
             self.sub_worker.start()
 
+    def on_scrape_progress(self, current, total, status_text):
+        self.progress.setRange(0, total)
+        self.progress.setValue(current)
+        self.progress_status_label.setText(status_text)
+
     def on_found(self, slist):
-        self.progress.setVisible(False); self.found_sources = slist
+        self.progress_container.setVisible(False)
+        self.found_sources = slist
         if not slist: self.sources_list.addItem("No sources found.")
         for s in slist: 
             self.sources_list.addItem(f"[{s.get('quality', 'SD')}] {s.get('source')} ({s.get('provider')})")
@@ -1443,7 +1515,9 @@ class UniversalApp(QMainWindow):
         source_data = self.found_sources[idx]
         print(f"\n--- RESOLVING ---\nSource: {source_data['source']}\nProvider: {source_data['provider']}")
         
-        self.progress.setVisible(True); self.progress.setRange(0, 0)
+        self.progress_container.setVisible(True)
+        self.progress.setRange(0, 0)
+        self.progress_status_label.setText("Resolving stream URL...")
         self.edit_stream_url.clear()
         
         self.resolve_worker = ResolveWorker(source_data, self.get_enabled_packs())
@@ -1452,14 +1526,14 @@ class UniversalApp(QMainWindow):
         self.resolve_worker.start()
 
     def on_resolved(self, final):
-        self.progress.setVisible(False)
+        self.progress_container.setVisible(False)
         self.edit_stream_url.setText(final)
         QApplication.clipboard().setText(final)
         print(f"SUCCESS: {final}")
         QMessageBox.information(self, "Success", "Stream URL resolved and copied to clipboard!")
 
     def on_resolve_failed(self, err_msg):
-        self.progress.setVisible(False)
+        self.progress_container.setVisible(False)
         QMessageBox.warning(self, "Failed", f"Could not resolve stream: {err_msg}")
 
     def on_subtitle_selected(self, li):
@@ -1467,7 +1541,9 @@ class UniversalApp(QMainWindow):
         if idx >= len(self.found_subtitles): return
         selected = self.found_subtitles[idx]
         
-        self.progress.setVisible(True); self.progress.setRange(0, 0)
+        self.progress_container.setVisible(True)
+        self.progress.setRange(0, 0)
+        self.progress_status_label.setText("Downloading subtitle...")
         self.edit_subtitle_url.clear()
         
         self.sub_download_worker = SubtitleDownloadWorker(
@@ -1480,13 +1556,13 @@ class UniversalApp(QMainWindow):
         self.sub_download_worker.start()
 
     def on_subtitle_downloaded(self, filepath):
-        self.progress.setVisible(False)
+        self.progress_container.setVisible(False)
         self.edit_subtitle_url.setText(filepath)
         QApplication.clipboard().setText(filepath)
         QMessageBox.information(self, "Success", f"Subtitle downloaded successfully to:\n{filepath}\n\nPath copied to clipboard!")
 
     def on_subtitle_download_failed(self, err_msg):
-        self.progress.setVisible(False)
+        self.progress_container.setVisible(False)
         QMessageBox.warning(self, "Failed", f"Could not download subtitle: {err_msg}")
 
     def copy_stream_url(self):
