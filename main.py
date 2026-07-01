@@ -137,6 +137,7 @@ def load_config():
         "addic7ed_enabled": True,
         "bsplayer_enabled": False,
         "opensubtitles_enabled": True,
+        "opensubtitles_org_enabled": False,
         "podnadpisi_enabled": False,
         "subdl_enabled": True,
         "subsource_enabled": True,
@@ -176,9 +177,6 @@ class UniversalScraper:
         else:
             self.hostDict = []
 
-        provider_set = set(gather_provider_pack_hosts())
-        self.provider_hosts = [h for h in self.hostDict if h in provider_set]
-
     def getSources(self, title, year, imdb, tmdb, tvdb='0', season=None, episode=None, tvshowtitle=None, premiered='0', progress_callback=None):
         print(f"\n[ENGINE] Starting Universal Scrape for: {title} ({year})")
         providers = []
@@ -199,7 +197,7 @@ class UniversalScraper:
                             instance = mod.source()
                             instance_domains = [d.lower() for d in (getattr(instance, 'domains', None) or [])]
                             if self.hostDict and instance_domains:
-                                if not any(d in self.provider_hosts for d in instance_domains):
+                                if not any(d in self.hostDict for d in instance_domains):
                                     print(f"[ENGINE] Skipping {pack}/{file}: no whitelisted domains in {instance_domains}")
                                     continue
                             providers.append((pack, file[:-3], instance))
@@ -367,7 +365,7 @@ class SettingsDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Engine & Provider Settings")
-        self.resize(550, 650)
+        self.resize(750, 650)
         self.layout = QVBoxLayout(self)
         self.cfg = GLOBAL_CONFIG
         self.tabs = QTabWidget()
@@ -427,35 +425,34 @@ class SettingsDialog(QDialog):
         self.host_search.setPlaceholderText("Search hosts...")
         self.host_search.textChanged.connect(self.filter_hosts)
         search_layout.addWidget(self.host_search)
-        self.btn_all = QPushButton("Select All")
-        self.btn_all.clicked.connect(self.select_all_hosts)
-        self.btn_none = QPushButton("Clear All")
-        self.btn_none.clicked.connect(self.clear_all_hosts)
         self.btn_default = QPushButton("Reset to Defaults")
         self.btn_default.clicked.connect(self.reset_hosts_to_default)
-        search_layout.addWidget(self.btn_all)
-        search_layout.addWidget(self.btn_none)
         search_layout.addWidget(self.btn_default)
         self.layout_hosts.addLayout(search_layout)
         self.scroll_hosts = QScrollArea()
         self.scroll_hosts.setWidgetResizable(True)
         content_hosts = QWidget()
-        self.vbox_hosts = QVBoxLayout(content_hosts)
+        self.hbox_hosts = QHBoxLayout(content_hosts)
+        self.hbox_hosts.setContentsMargins(0, 0, 0, 0)
+        self.hbox_hosts.setSpacing(10)
         self.host_checkboxes = {}
+        self.section_buttons = []
+
         resolveurl_set = set(gather_resolveurl_hosts())
         provider_set = set(gather_provider_pack_hosts())
-        all_hosts = sorted(resolveurl_set | provider_set)
+        default_set = set(d.lower() for d in DEFAULT_WHITELIST)
         whitelisted = self.cfg.get("whitelisted_hosts", [])
         whitelisted_low = set(w.lower() for w in whitelisted)
 
-        resolveurl_only = [h for h in all_hosts if h in resolveurl_set]
-        provider_only = [h for h in all_hosts if h in provider_set and h not in resolveurl_set]
+        all_hosts = sorted(resolveurl_set | provider_set | default_set | whitelisted_low)
 
-        section_resolveurl = self._build_host_section("ResolveURL Hosts", resolveurl_only, whitelisted_low)
-        section_provider = self._build_host_section("Provider Pack Hosts", provider_only, whitelisted_low)
-        self.vbox_hosts.addWidget(section_resolveurl)
-        self.vbox_hosts.addWidget(section_provider)
-        self.vbox_hosts.addStretch()
+        resolveurl_hosts = [h for h in all_hosts if h in resolveurl_set]
+        provider_hosts = [h for h in all_hosts if h not in resolveurl_set]
+
+        section_resolveurl = self._build_host_section("ResolveURL Hosts", resolveurl_hosts, whitelisted_low)
+        section_provider = self._build_host_section("Provider Pack Hosts", provider_hosts, whitelisted_low)
+        self.hbox_hosts.addWidget(section_resolveurl)
+        self.hbox_hosts.addWidget(section_provider)
         self.scroll_hosts.setWidget(content_hosts)
         self.layout_hosts.addWidget(self.scroll_hosts)
         self.tabs.addTab(self.tab_hosts, "Provider Whitelist")
@@ -567,9 +564,50 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(frame)
         layout.setContentsMargins(10, 8, 10, 10)
         layout.setSpacing(4)
+        
+        header_layout = QHBoxLayout()
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(6)
+        
         header = QLabel(f"<b>{title}</b>")
         header.setStyleSheet("color: #0e639c; padding-bottom: 2px; background: transparent; border: none;")
-        layout.addWidget(header)
+        header_layout.addWidget(header)
+        header_layout.addStretch()
+        
+        btn_style = '''
+            QPushButton {
+                padding: 3px 6px;
+                background-color: #2d2d2d;
+                border: 1px solid #444;
+                border-radius: 4px;
+                font-size: 11px;
+                font-weight: normal;
+            }
+            QPushButton:hover {
+                background-color: #3d3d3d;
+                border-color: #555;
+            }
+            QPushButton:disabled {
+                background-color: #202020;
+                color: #555;
+                border-color: #333;
+            }
+        '''
+        
+        btn_sel = QPushButton("Select All")
+        btn_sel.setStyleSheet(btn_style)
+        btn_sel.clicked.connect(lambda: self.select_hosts_in_section(hosts))
+        self.section_buttons.append(btn_sel)
+        
+        btn_clr = QPushButton("Clear All")
+        btn_clr.setStyleSheet(btn_style)
+        btn_clr.clicked.connect(lambda: self.clear_hosts_in_section(hosts))
+        self.section_buttons.append(btn_clr)
+        
+        header_layout.addWidget(btn_sel)
+        header_layout.addWidget(btn_clr)
+        layout.addLayout(header_layout)
+        
         inner = QVBoxLayout()
         inner.setContentsMargins(0, 0, 0, 0)
         inner.setSpacing(2)
@@ -580,38 +618,39 @@ class SettingsDialog(QDialog):
             self.host_checkboxes[h] = cb
             inner.addWidget(cb)
         layout.addLayout(inner)
+        layout.addStretch()
         return frame
 
     def update_hosts_enabled_state(self):
         is_checked = self.cb_use_only.isChecked()
         self.host_search.setEnabled(is_checked)
-        self.btn_all.setEnabled(is_checked)
-        self.btn_none.setEnabled(is_checked)
         self.btn_default.setEnabled(is_checked)
         self.scroll_hosts.setEnabled(is_checked)
-        if is_checked:
-            any_checked = any(cb.isChecked() for cb in self.host_checkboxes.values())
-            if not any_checked:
-                self.reset_hosts_to_default()
+        for btn in self.section_buttons:
+            btn.setEnabled(is_checked)
 
     def filter_hosts(self, text):
         text = text.lower().strip()
         for h, cb in self.host_checkboxes.items():
             cb.setVisible(not text or text in h)
 
-    def select_all_hosts(self):
-        for cb in self.host_checkboxes.values():
-            cb.blockSignals(True)
-            if cb.isVisible():
-                cb.setChecked(True)
-            cb.blockSignals(False)
+    def select_hosts_in_section(self, hosts_list):
+        for h in hosts_list:
+            if h in self.host_checkboxes:
+                cb = self.host_checkboxes[h]
+                cb.blockSignals(True)
+                if cb.isVisible():
+                    cb.setChecked(True)
+                cb.blockSignals(False)
         self.on_host_checkbox_changed()
 
-    def clear_all_hosts(self):
-        for cb in self.host_checkboxes.values():
-            cb.blockSignals(True)
-            cb.setChecked(False)
-            cb.blockSignals(False)
+    def clear_hosts_in_section(self, hosts_list):
+        for h in hosts_list:
+            if h in self.host_checkboxes:
+                cb = self.host_checkboxes[h]
+                cb.blockSignals(True)
+                cb.setChecked(False)
+                cb.blockSignals(False)
         self.on_host_checkbox_changed()
 
     def reset_hosts_to_default(self):
@@ -633,10 +672,10 @@ class SettingsDialog(QDialog):
             
         is_checked = self.cb_use_only.isChecked()
         self.host_search.setEnabled(is_checked)
-        self.btn_all.setEnabled(is_checked)
-        self.btn_none.setEnabled(is_checked)
         self.btn_default.setEnabled(is_checked)
         self.scroll_hosts.setEnabled(is_checked)
+        for btn in self.section_buttons:
+            btn.setEnabled(is_checked)
 
     def update_ui_state(self, mode):
         lbl_global = self.form_layout.labelForField(self.time_global)
@@ -668,7 +707,9 @@ class SettingsDialog(QDialog):
             self.cfg[pack_key] = cb.isChecked()
 
         self.cfg["use_only_whitelisted_hosts"] = self.cb_use_only.isChecked()
-        self.cfg["whitelisted_hosts"] = [h for h, cb in self.host_checkboxes.items() if cb.isChecked()]
+        self.cfg["whitelisted_hosts"] = sorted(list(set(
+            [h for h, cb in self.host_checkboxes.items() if cb.isChecked()]
+        )))
         
         self.cfg["subtitles_languages"] = self.edit_sub_langs.text()
         self.cfg["subtitles_limit"] = int(self.combo_sub_limit.currentText())
